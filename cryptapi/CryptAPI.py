@@ -266,6 +266,8 @@ class CryptAPIHelper:
             CryptAPIException: If the API returns an error.
         """
         if coin:
+            if "/" not in coin:
+                coin = coin.replace("_", "/")
             coin += "/"
         else:
             coin = ""
@@ -273,7 +275,7 @@ class CryptAPIHelper:
         response = requests.get(
             url="{base_url}{coin}{endpoint}/".format(
                 base_url=CryptAPIHelper.CRYPTAPI_URL,
-                coin=coin.replace("_", "/"),
+                coin=coin,
                 endpoint=endpoint,
             ),
             params=params,

@@ -277,13 +277,15 @@ class AsyncCryptAPIHelper:
             CryptAPIException: If the API returns an error.
         """
         if coin:
+            if "/" not in coin:
+                coin = coin.replace("_", "/")
             coin += "/"
         else:
             coin = ""
 
         url = "{base_url}{coin}{endpoint}/".format(
             base_url=AsyncCryptAPIHelper.CRYPTAPI_URL,
-            coin=coin.replace("_", "/"),
+            coin=coin,
             endpoint=endpoint,
         )
 
