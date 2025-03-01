@@ -12,16 +12,9 @@ generating QR codes, checking payment logs, and performing various cryptocurrenc
 import aiohttp
 import ssl
 import certifi
-from .utils import prepare_url, process_supported_coins
 
-
-class CryptAPIException(Exception):
-    """
-    Exception raised for CryptAPI-specific errors.
-    Used when the API returns an error response.
-    """
-
-    pass
+from .exceptions import CryptAPIException
+from .utils import process_supported_coins
 
 
 class AsyncCryptAPIHelper:
@@ -107,7 +100,15 @@ class AsyncCryptAPIHelper:
         """
         coin = self.coin
 
-        callback_url = prepare_url(self.callback_url, self.parameters)
+        # 使用requests.PreparedRequest来处理URL，而不是调用_prepare_callback_url
+        callback_url = self.callback_url
+
+        if self.parameters:
+            from requests.models import PreparedRequest
+
+            req = PreparedRequest()
+            req.prepare_url(self.callback_url, self.parameters)
+            callback_url = req.url
 
         params = {"address": self.own_address, "callback": callback_url}
 
@@ -134,11 +135,39 @@ class AsyncCryptAPIHelper:
             CryptAPIException: If the API returns an error.
         """
         coin = self.coin
-        callback_url = prepare_url(self.callback_url, self.parameters)
+
+        # 使用requests.PreparedRequest来处理URL，而不是完全编码
+        callback_url = self.callback_url
+
+        if self.parameters:
+            from requests.models import PreparedRequest
+
+            req = PreparedRequest()
+            req.prepare_url(self.callback_url, self.parameters)
+            callback_url = req.url
 
         params = {"callback": callback_url}
 
         return await self.process_request(coin, endpoint="logs", params=params)
+
+    def _prepare_callback_url(self):
+        """
+        Process the callback URL by adding user parameters.
+
+        This method appends the user parameters to the callback URL as query parameters.
+        The callback URL is also URL encoded to ensure it's properly handled by the API.
+
+        Returns:
+            str: The processed and URL encoded callback URL with parameters.
+        """
+        if not self.parameters:
+            return self.callback_url
+
+        from requests.models import PreparedRequest
+
+        req = PreparedRequest()
+        req.prepare_url(self.callback_url, self.parameters)
+        return req.url
 
     async def get_qrcode(self, value="", size=300):
         """

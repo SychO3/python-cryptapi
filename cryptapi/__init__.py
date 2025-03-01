@@ -1,11 +1,11 @@
-from .CryptAPI import CryptAPIHelper, CryptAPIException
+from .CryptAPI import CryptAPIHelper
 from .AsyncCryptAPI import AsyncCryptAPIHelper
-from .utils import prepare_url, process_supported_coins
+from .exceptions import CryptAPIException
+from .utils import process_supported_coins
 
 __all__ = [
     "CryptAPIHelper",
     "AsyncCryptAPIHelper",
     "CryptAPIException",
-    "prepare_url",
     "process_supported_coins",
 ]

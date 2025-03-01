@@ -37,11 +37,10 @@ async def run_tests():
     print("Creating AsyncCryptAPIHelper instance...")
     # Initialize AsyncCryptAPIHelper instance
     ca = AsyncCryptAPIHelper(
-        "bep20_usdt",
-        "0xA6B78B56ee062185E405a1DDDD18cE8fcBC4395d",
-        "https://webhook.site/13308bd5-d20b-4d19-8597-bd9be7db36fe",
-        {"order_id": "1345e13232"},
-        {"convert": 1, "multi_token": 1},
+        "trc20/usdt",
+        "TKUWuYXiP2khFp46miao7ARweccccccccc",
+        "https://cryptapi.515111.xyz/callback",
+        {"user_id": "5323355513", "order_id": "86c1f46e2bdc"},
     )
     print("Instance created, starting method tests...")
 

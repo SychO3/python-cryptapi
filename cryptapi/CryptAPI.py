@@ -9,16 +9,9 @@ checking payment logs, and performing various cryptocurrency-related operations.
 """
 
 import requests
-from .utils import prepare_url, process_supported_coins
 
-
-class CryptAPIException(Exception):
-    """
-    Exception raised for CryptAPI-specific errors.
-    Used when the API returns an error response.
-    """
-
-    pass
+from .exceptions import CryptAPIException
+from .utils import process_supported_coins
 
 
 class CryptAPIHelper:
@@ -98,7 +91,13 @@ class CryptAPIHelper:
         """
         coin = self.coin
 
-        callback_url = self._prepare_callback_url()
+        # 使用requests.PreparedRequest来处理URL，而不是调用_prepare_callback_url
+        callback_url = self.callback_url
+
+        if self.parameters:
+            req = requests.models.PreparedRequest()
+            req.prepare_url(self.callback_url, self.parameters)
+            callback_url = req.url
 
         params = {"address": self.own_address, "callback": callback_url}
 
@@ -128,7 +127,13 @@ class CryptAPIHelper:
         """
         coin = self.coin
 
-        callback_url = self._prepare_callback_url()
+        # 使用requests.PreparedRequest来处理URL，而不是完全编码
+        callback_url = self.callback_url
+
+        if self.parameters:
+            req = requests.models.PreparedRequest()
+            req.prepare_url(self.callback_url, self.parameters)
+            callback_url = req.url
 
         params = {"callback": callback_url}
 
@@ -237,7 +242,12 @@ class CryptAPIHelper:
         Returns:
             str: The processed and URL encoded callback URL with parameters.
         """
-        return prepare_url(self.callback_url, self.parameters)
+        if not self.parameters:
+            return self.callback_url
+
+        req = requests.models.PreparedRequest()
+        req.prepare_url(self.callback_url, self.parameters)
+        return req.url
 
     @staticmethod
     def process_request(coin=None, endpoint="", params=None):
