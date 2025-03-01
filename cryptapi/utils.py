@@ -29,7 +29,7 @@ def prepare_url(url, params=None):
         query_params = "&".join(f"{k}={v}" for k, v in params.items())
         result_url = f"{url}{separator}{query_params}"
 
-    return urllib.parse.quote(result_url, safe=":/?=&")
+    return urllib.parse.quote(result_url, safe="")
 
 
 def process_supported_coins(info_response):
