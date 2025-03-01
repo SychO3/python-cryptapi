@@ -1,14 +1,17 @@
 """
-CryptAPI's Python Helper
+CryptAPI's Python Async Helper
 
-This module provides a Python wrapper for the CryptAPI cryptocurrency payment gateway.
-It allows developers to easily integrate cryptocurrency payments into their applications.
+This module provides an asynchronous Python wrapper for the CryptAPI cryptocurrency payment gateway.
+It allows developers to easily integrate cryptocurrency payments into their applications using
+modern Python async/await syntax for improved performance and scalability.
 
-The CryptAPIHelper class provides methods for creating payment addresses, generating QR codes,
-checking payment logs, and performing various cryptocurrency-related operations.
+The AsyncCryptAPIHelper class provides asynchronous methods for creating payment addresses,
+generating QR codes, checking payment logs, and performing various cryptocurrency-related operations.
 """
 
-import requests
+import aiohttp
+import ssl
+import certifi
 from .utils import prepare_url, process_supported_coins
 
 
@@ -21,12 +24,13 @@ class CryptAPIException(Exception):
     pass
 
 
-class CryptAPIHelper:
+class AsyncCryptAPIHelper:
     """
-    Helper class for interacting with the CryptAPI cryptocurrency payment gateway.
+    Asynchronous helper class for interacting with the CryptAPI cryptocurrency payment gateway.
 
-    This class provides methods to create payment addresses, retrieve logs,
-    generate QR codes, and perform other cryptocurrency-related operations.
+    This class provides asynchronous methods to create payment addresses, retrieve logs,
+    generate QR codes, and perform other cryptocurrency-related operations. All methods
+    are designed to be used with Python's async/await syntax for non-blocking operation.
 
     Attributes:
         CRYPTAPI_URL (str): Base URL for the CryptAPI service.
@@ -37,6 +41,8 @@ class CryptAPIHelper:
         parameters (dict): Custom parameters to be appended to the callback URL.
         ca_params (dict): Additional parameters for CryptAPI requests.
         payment_Address (str): Generated payment address for receiving funds.
+        ssl_context (ssl.SSLContext): SSL context for secure connections.
+        conn (aiohttp.TCPConnector): TCP connector with SSL context.
     """
 
     CRYPTAPI_URL = "https://api.cryptapi.io/"
@@ -46,7 +52,7 @@ class CryptAPIHelper:
         self, coin, own_address, callback_url, parameters=None, ca_params=None
     ):
         """
-        Initialize a new CryptAPIHelper instance.
+        Initialize a new AsyncCryptAPIHelper instance.
 
         Args:
             coin (str): The cryptocurrency ticker (e.g., 'btc', 'eth', 'bep20_usdt').
@@ -82,41 +88,42 @@ class CryptAPIHelper:
         self.ca_params = ca_params
         self.payment_Address = ""
 
-    def get_address(self):
+        self.ssl_context = ssl.create_default_context(cafile=certifi.where())
+        self.conn = aiohttp.TCPConnector(ssl=self.ssl_context)
+
+    async def get_address(self):
         """
-        Generate a new payment address for receiving cryptocurrency.
+        Asynchronously generate a new payment address for receiving cryptocurrency.
 
         This method creates a new payment address that forwards funds to your wallet,
         and sets up the callback notification.
 
         Returns:
             dict: Response from the CryptAPI service containing the generated address
-                 and other payment information.
+                 and other payment information, or None if the request failed.
 
         Raises:
             CryptAPIException: If the API returns an error.
         """
         coin = self.coin
 
-        callback_url = self._prepare_callback_url()
+        callback_url = prepare_url(self.callback_url, self.parameters)
 
         params = {"address": self.own_address, "callback": callback_url}
 
         if self.ca_params:
             params.update(self.ca_params)
 
-        response_obj = CryptAPIHelper.process_request(
-            coin, endpoint="create", params=params
-        )
+        _address = await self.process_request(coin, endpoint="create", params=params)
+        if _address:
+            self.payment_Address = _address["address_in"]
+            return _address
 
-        if "address_in" in response_obj:
-            self.payment_Address = response_obj["address_in"]
+        return None
 
-        return response_obj
-
-    def get_logs(self):
+    async def get_logs(self):
         """
-        Retrieve logs for the callback URL.
+        Asynchronously retrieve logs for the callback URL.
 
         This method fetches the payment logs associated with the current callback URL.
 
@@ -127,16 +134,15 @@ class CryptAPIHelper:
             CryptAPIException: If the API returns an error.
         """
         coin = self.coin
-
-        callback_url = self._prepare_callback_url()
+        callback_url = prepare_url(self.callback_url, self.parameters)
 
         params = {"callback": callback_url}
 
-        return CryptAPIHelper.process_request(coin, endpoint="logs", params=params)
+        return await self.process_request(coin, endpoint="logs", params=params)
 
-    def get_qrcode(self, value="", size=300):
+    async def get_qrcode(self, value="", size=300):
         """
-        Generate a QR code for the payment address.
+        Asynchronously generate a QR code for the payment address.
 
         Args:
             value (str, optional): The amount to pay. Defaults to '' (empty string).
@@ -153,13 +159,11 @@ class CryptAPIHelper:
         if value:
             params["value"] = value
 
-        return CryptAPIHelper.process_request(
-            self.coin, endpoint="qrcode", params=params
-        )
+        return await self.process_request(self.coin, endpoint="qrcode", params=params)
 
-    def get_conversion(self, from_coin, value):
+    async def get_conversion(self, from_coin, value):
         """
-        Get conversion rates between currencies.
+        Asynchronously get conversion rates between currencies.
 
         Args:
             from_coin (str): Source currency code (e.g., 'usd', 'eur').
@@ -173,14 +177,12 @@ class CryptAPIHelper:
         """
         params = {"from": from_coin, "value": value}
 
-        return CryptAPIHelper.process_request(
-            self.coin, endpoint="convert", params=params
-        )
+        return await self.process_request(self.coin, endpoint="convert", params=params)
 
     @staticmethod
-    def get_info(coin=""):
+    async def get_info(coin=""):
         """
-        Get information about a specific coin or all supported coins.
+        Asynchronously get information about a specific coin or all supported coins.
 
         Args:
             coin (str, optional): Coin ticker. If empty, returns info for all coins. Defaults to ''.
@@ -191,12 +193,12 @@ class CryptAPIHelper:
         Raises:
             CryptAPIException: If the API returns an error.
         """
-        return CryptAPIHelper.process_request(coin, endpoint="info")
+        return await AsyncCryptAPIHelper.process_request(coin, endpoint="info")
 
     @staticmethod
-    def get_supported_coins():
+    async def get_supported_coins():
         """
-        Get a list of all supported cryptocurrencies.
+        Asynchronously get a list of all supported cryptocurrencies.
 
         Returns:
             dict: Dictionary of supported coins with tickers as keys and names as values.
@@ -204,13 +206,13 @@ class CryptAPIHelper:
         Raises:
             CryptAPIException: If the API returns an error.
         """
-        _info = CryptAPIHelper.get_info("")
+        _info = await AsyncCryptAPIHelper.get_info("")
         return process_supported_coins(_info)
 
     @staticmethod
-    def get_estimate(coin, addresses=1, priority="default"):
+    async def get_estimate(coin, addresses=1, priority="default"):
         """
-        Get an estimate of the network fees.
+        Asynchronously get an estimate of the network fees.
 
         Args:
             coin (str): Coin ticker.
@@ -225,24 +227,14 @@ class CryptAPIHelper:
         """
         params = {"addresses": addresses, "priority": priority}
 
-        return CryptAPIHelper.process_request(coin, endpoint="estimate", params=params)
-
-    def _prepare_callback_url(self):
-        """
-        Process the callback URL by adding user parameters.
-
-        This method appends the user parameters to the callback URL as query parameters.
-        The callback URL is also URL encoded to ensure it's properly handled by the API.
-
-        Returns:
-            str: The processed and URL encoded callback URL with parameters.
-        """
-        return prepare_url(self.callback_url, self.parameters)
+        return await AsyncCryptAPIHelper.process_request(
+            coin, endpoint="estimate", params=params
+        )
 
     @staticmethod
-    def process_request(coin=None, endpoint="", params=None):
+    async def process_request(coin=None, endpoint="", params=None):
         """
-        Process an API request to the CryptAPI service.
+        Process an asynchronous API request to the CryptAPI service.
 
         Args:
             coin (str, optional): Coin ticker. Defaults to None.
@@ -260,19 +252,25 @@ class CryptAPIHelper:
         else:
             coin = ""
 
-        response = requests.get(
-            url="{base_url}{coin}{endpoint}/".format(
-                base_url=CryptAPIHelper.CRYPTAPI_URL,
-                coin=coin.replace("_", "/"),
-                endpoint=endpoint,
-            ),
-            params=params,
-            headers={"Host": CryptAPIHelper.CRYPTAPI_HOST},
+        url = "{base_url}{coin}{endpoint}/".format(
+            base_url=AsyncCryptAPIHelper.CRYPTAPI_URL,
+            coin=coin.replace("_", "/"),
+            endpoint=endpoint,
         )
 
-        response_obj = response.json()
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-        if response_obj.get("status") == "error":
-            raise CryptAPIException(response_obj["error"])
+        async with aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(ssl=ssl_context)
+        ) as session:
+            async with session.get(
+                url=url,
+                params=params,
+                headers={"Host": AsyncCryptAPIHelper.CRYPTAPI_HOST},
+            ) as response:
+                response_obj = await response.json()
 
-        return response_obj
+                if response_obj.get("status") == "error":
+                    raise CryptAPIException(response_obj["error"])
+
+                return response_obj
